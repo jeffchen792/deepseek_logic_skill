@@ -1,51 +1,78 @@
 ---
-name: diagnosis-first
-description: "Diagnose root cause before fixing — never make symptoms disappear by disabling mechanisms."
-version: 1.0.0
-tags: [debugging, methodology, safety, discipline]
+name: root-cause-first
+description: "Systematic debugging: understand before acting. A thinking framework for diagnosing and fixing problems without breaking things."
+version: 2.0.0
+tags: [debugging, methodology, thinking, logic]
 triggers:
-  - fix this error
-  - it stopped working after
-  - debug this
-  - why is this broken
+  - debug
+  - fix
+  - broken
+  - not working
+  - error
+  - why
 ---
 
-# Diagnosis First — 先診斷，再修復
+# Root Cause First — 先想清楚，再動手
 
-## 核心原則
+## 五步思考框架
 
-**任何修法如果是「關掉一個機制」而不是「修正它」，先解釋清楚為什麼原本的機制會失敗。**
-
-## 三個實例
-
-| 專案 | 症狀 | 錯的修法 | 為什麼錯 | 正確診斷 |
-|------|------|----------|----------|----------|
-| Portfolio 3D | 滾動卡死 | `events={() => undefined}` 關掉 R3F render loop | 沒問為什麼 canvas 會吃滾輪事件 | R3F canvas 的 pointer-events: auto 攔截了 wheel，應該設 pointer-events: none |
-| Calendar 照片 | 照片不顯示 | 調低 opacity 融進黑底 | 沒問為什麼照片在畫面下方 | z-index 疊層順序：calendar grid 蓋在照片上面 |
-| Calendar RLS | 500 遞迴錯誤 | `USING(true)` 關掉整組 RLS | 沒問為什麼 policy 會遞迴 | `users` 表的 policy 查了自己，需要 SECURITY DEFINER function 繞過 |
-
-## 診斷流程
+遇到任何問題，按這個順序走完再寫 code：
 
 ```
-收到報錯/異常
-    │
-    ├─ 1. 重現 → 確認不是偶發
-    ├─ 2. 定位 → 哪個機制失敗了？（不是哪行報錯）
-    ├─ 3. 理解 → 這個機制設計來做什麼？為什麼現在失效？
-    ├─ 4. 修正 → 讓機制正常工作，不是繞過它
-    └─ 5. 驗證 → 確認其他保護都沒被動到
+1. 這東西本來是幹嘛的？
+   └─ 理解機制的設計意圖，不是只看它現在的行為
+
+2. 什麼觸發了它失敗？
+   └─ 重現 → 縮小範圍 → 找到最小觸發條件
+
+3. 為什麼這個觸發會讓它失敗？
+   └─ 這是核心。不是「報了什麼錯」，是「為什麼這個輸入會造成這個結果」
+
+4. 怎麼讓它在這個情況下正常工作？
+   └─ 修正機制本身，不是繞過它、關掉它、或用另一條路取代它
+
+5. 修完之後，有沒有弄壞別的東西？
+   └─ 安全性、效能、其他功能、邊界情況
 ```
 
-## 紅旗（立刻停下來診斷）
+## 三個反例（來自本專案實際踩坑）
 
-- 修法裡有 `true`、`none`、`() => undefined`、`disabled`、`skip`
-- 修法是在「關掉」或「繞過」一個既有保護
-- 錯誤消失了，但不確定為什麼消失
-- 同一段程式碼被反覆改了三種不同方向
+| 症狀 | 錯的做法 | 跳過了哪步 | 正確做法 |
+|------|----------|-----------|----------|
+| 滾動卡死 | `events={() => undefined}` | 第 3 步 — 沒問 canvas 為什麼會吃事件 | canvas pointer-events: none |
+| RLS 500 | `USING(true)` | 第 3 步 — 沒問 policy 為什麼遞迴 | SECURITY DEFINER function |
+| 照片不顯示 | 調低 opacity | 第 3 步 — 沒問 z-index 疊層順序 | 修正層級關係 |
 
-## 鐵則
+共同模式：**把警報器關掉，當作問題不存在。**
 
-1. **讓報錯消失 ≠ 修好了**。報錯是症狀，不是病因。
-2. **拔掉保護機制之前，先問它本來在擋什麼。**
-3. **如果解釋不清楚為什麼會失敗，就不要改。**
-4. **修正後，確認沒有副作用（其他功能、安全性、效能）。**
+## 決策樹
+
+```
+收到問題
+  │
+  ├─ 知道這個機制怎麼運作嗎？
+  │   ├─ 不知道 → 先讀原始碼/文件，不要猜
+  │   └─ 知道 → 往下
+  │
+  ├─ 能穩定重現嗎？
+  │   ├─ 不能 → 加 log，收集更多資訊
+  │   └─ 能 → 往下
+  │
+  ├─ 理解為什麼這個輸入會造成這個結果嗎？
+  │   ├─ 不理解 → 縮小範圍，隔離變數
+  │   └─ 理解 → 往下
+  │
+  ├─ 修法是「修正」還是「繞過」？
+  │   ├─ 繞過 → 停下來，這不是修好
+  │   └─ 修正 → 往下
+  │
+  └─ 旁邊的東西都還正常嗎？
+      ├─ 不確定 → 加測試/手動驗證
+      └─ 正常 → 收工，記下來
+```
+
+## 紅旗詞彙（看到這些修法立刻警覺）
+
+`true`, `false`, `none`, `undefined`, `skip`, `disabled`, `() => null`, `return`, `!!`, `try {} catch {}`（空的 catch）
+
+這些詞本身沒問題，但如果是用來「讓某個保護機制失效」，就是紅旗。
