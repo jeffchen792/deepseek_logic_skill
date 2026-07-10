@@ -122,6 +122,42 @@ skip3D watchdog → 前 4 秒偵測到慢幀就永久降級
 
 ---
 
+## 技巧：3D 視覺效果不靠後處理
+
+### 星球光暈（不用 postprocessing 的 bloom）
+```jsx
+// Canvas 放射漸層貼圖 + additive sprite = 免費 bloom
+const tex = useMemo(() => {
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const grad = c.getContext("2d").createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.3, "rgba(255,255,255,0.4)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}, []);
+// 每顆星掛一個 sprite（永遠面朝相機）+ additive blending
+<sprite scale={[3.6, 3.6, 1]}>
+  <spriteMaterial map={tex} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} />
+</sprite>
+```
+**適用**：手機跑不動 postprocessing 時的發光替代方案。
+
+### 星塵升級（vertex colors + 共用貼圖）
+白色點 → 粉/藍/紫三色 vertex colors + 圓形軟粒子貼圖 + additive blending + useFrame opacity 閃爍。
+**關鍵**：vertex colors 不佔額外 GPU 記憶體，additive blending 自然混色。
+
+### 今天呼吸格（純 CSS 動畫）
+```css
+@keyframes todayBreathe {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(192, 132, 252, 0.2); }
+  50% { box-shadow: inset 0 0 0 1px rgba(192, 132, 252, 0.6); }
+}
+```
+**適用**：日曆裡標記今天的格子的微弱呼吸效果，3 秒週期，零 JS。
+
+---
+
 ## 快速查表
 
 | 看到什麼 | 先做什麼檢查 |
