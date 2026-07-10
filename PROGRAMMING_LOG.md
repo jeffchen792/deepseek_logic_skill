@@ -17,6 +17,16 @@ setTimeout(() => setReady(true), 3000);
 ```
 **偵測**：元件沒 render 但沒報錯 → 檢查所有 conditional render 的 gate。
 
+### 空狀態的條件渲染死結
+```jsx
+// ❌ 只有已設定日期的人才看得到設定按鈕 → 沒設定的人永遠找不到入口
+{user?.pairedAt && <EditButton />}
+
+// ✅ 永遠顯示入口，沒設定時用不同文字
+<EditButton>{user?.pairedAt ? `${days}天` : "設定紀念日"}</EditButton>
+```
+**偵測**：功能「存在但找不到」→ 問「第一次進來條件會是 true 還是 false」。
+
 ### R3F `useFrame` 不執行
 `<Canvas events={() => undefined}>` 會讓整個 render loop 停擺。不是「關掉事件」而已。
 **偵測**：3D 場景不更新 → 在 `useFrame` 裡加 `console.count()` 看有沒有在跑。
@@ -27,15 +37,20 @@ setTimeout(() => setReady(true), 3000);
 
 ---
 
-## 症狀：滾動卡死 / 點擊無反應
+## 症狀：改 A 結果 B 壞了
 
-### R3F Canvas 吃事件
-`<Canvas>` 內部對 `canvas` DOM 設了 `pointer-events: auto`，蓋掉外層設定。
-```jsx
-// ✅ 在 onCreated 裡直接改 DOM
-onCreated={(state) => { state.gl.domElement.style.pointerEvents = "none"; }}
-```
-**偵測**：`getComputedStyle(canvas).pointerEvents` 看是不是 `auto`。
+### 加新功能時拆掉舊功能的條件分支
+加「星空」tab 時，把月曆/列表的條件渲染合併成一個區塊，導致兩個 view 永遠顯示相同內容。
+**偵測**：點 tab 畫面沒變 → 檢查每個 tab 對應的 JSX 是否被合併或條件被移除。
+
+---
+
+## 症狀：兩個裝置看到不同資料
+
+### localStorage 不是共享的
+`pairedAt` 只存 localStorage → A 改了 B 看不到，兩人各說各話。
+**解法**：多人共享的資料要放後端（Supabase），localStorage 只放個人偏好。
+**偵測**：A 操作後 B 沒變化 → 檢查資料存在 localStorage 還是資料庫。
 
 ---
 
@@ -113,6 +128,9 @@ skip3D watchdog → 前 4 秒偵測到慢幀就永久降級
 |----------|-------------|
 | 畫面空白 + 無報錯 | 檢查 conditional gate、視錐、z-index |
 | 畫面空白 + 有報錯 | 看是不是 Suspense 吞了 ErrorBoundary 該接的 |
+| 功能存在但找不到入口 | 檢查條件渲染的空狀態（第一次會是 true 嗎） |
+| A 操作 B 看不到 | 資料存 localStorage 還是後端 |
+| 點 tab 畫面沒變 | 檢查條件分支是否被合併/移除 |
 | 3D 不動 | `useFrame` 裡加 counter 看有沒有執行 |
 | 滾輪無效 | `getComputedStyle(canvas).pointerEvents` |
 | Supabase 500 | 看 error.message 有沒有 "recursion" |
